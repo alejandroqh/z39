@@ -2,7 +2,33 @@
 
 > **The missing link between LLM reasoning and formal verification.**
 
-z39 is a Rust CLI + MCP server that gives AI agents access to Z3's constraint solving through **domain-specific tools**, not raw SMT-LIB2. One binary: scriptable CLI by default (`z39 schedule …`), MCP server on demand (`z39 mcp`).
+<details open>
+<summary><b>Plain English</b></summary>
+
+z39 helps AI assistants answer tricky yes-or-no questions with certainty instead of a guess. Give it a problem like "can all these meetings fit in my day?" or "is this action safe to run?" and it checks the rules for you rather than making something up.
+
+</details>
+
+<details>
+<summary><b>For developers</b></summary>
+
+z39 is a single Rust binary that bundles a CLI and an MCP server over the Z3 solver. Call it from a shell script or drop it into an MCP config — structured JSON in, compact answers out. No daemon, no FFI, no separate Z3 install.
+
+</details>
+
+<details>
+<summary><b>For formal methods readers</b></summary>
+
+z39 exposes Z3 through four domain encoders — scheduling, boolean logic, configuration, and safety — each translating structured inputs into SMT-LIB2 (QF_LIA / QF_LRA / QF_UF) and interpreting models back into domain language. Decision problems framed as satisfiability: feasible / infeasible, valid / counterexample, consistent / conflicting.
+
+</details>
+
+<details>
+<summary><b>For both</b></summary>
+
+z39 is a Rust CLI + stdio MCP server that marshals typed JSON into SMT-LIB2, spawns Z3 as a subprocess under a timeout, and parses models into token-efficient output. Four domain encoders (schedule → QF_LIA ordering/no-overlap, logic → QF_UF over declared sorts, config → QF_LIA + enum expansion, safety → pure Rust) plus a raw-SMT escape hatch; async job lifecycle is MCP-only since one-shot CLI invocations can't hold it.
+
+</details>
 
 ## Why z39
 

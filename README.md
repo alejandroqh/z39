@@ -2,42 +2,24 @@
 
 > **The missing link between LLM reasoning and formal verification.**
 
-z39 is an MCP server that gives AI agents access to Z3's constraint solving capabilities through **domain-specific tools**, not raw SMT-LIB2.
+z39 is a Rust CLI + MCP server that gives AI agents access to Z3's constraint solving through **domain-specific tools**, not raw SMT-LIB2. One binary: scriptable CLI by default (`z39 schedule …`), MCP server on demand (`z39 mcp`).
 
-## Why z39?
+## Why z39
 
 LLMs understand messy human language. Z3 verifies precise logical constraints. Together they make AI agents more reliable: the agent doesn't just produce plausible answers, it can **prove** whether something is possible, impossible, equivalent, or unsafe.
 
-## Tools
+- **CLI for scripting**: `z39 schedule`, `z39 logic`, `z39 config`, `z39 safety`, `z39 solve` — one-shot invocations from a shell, Makefile, or test harness.
+- **MCP server on demand**: `z39 mcp` starts the MCP server over STDIO. No daemon between calls.
+- **Single binary, auto-provisioned Z3**: ships one executable. Z3 is downloaded automatically on first run if it isn't already installed.
+- **Subprocess isolation**: Z3 runs as a spawned subprocess (no FFI, no linking, crash-contained).
 
-### Domain-Specific (what agents actually need)
-
-| Tool | Human Question | What Z3 Does |
-|------|---------------|---------------|
-| `z39_schedule` | "Can I fit 5 meetings + lunch in my day?" | Scheduling with ordering, overlap, time-window constraints |
-| `z39_logic` | "Are these access rules equivalent?" / "Find me a counterexample" | Boolean logic verification, equivalence, consistency |
-| `z39_config` | "Do these deployment rules conflict?" | Configuration validation, constraint satisfaction |
-| `z39_safety` | "Is it safe to delete /etc/passwd?" | Pre-check actions against protected resources |
-
-### Low-Level (for advanced use)
-
-| Tool | Purpose |
-|------|---------|
-| `z39_solve` | Raw SMT-LIB2 to compact result |
-| `z39_solve_async` | Long-running solve (returns job_id) |
-| `z39_job_status` | Poll async job |
-| `z39_job_result` | Get async job result |
-| `z39_job_cancel` | Cancel async job |
-
-## Quick Start
-
-### Install
+## Install
 
 ```bash
 cargo install z39
 ```
 
-On first run, z39 will auto-provision Z3: it downloads the official binary on macOS/Windows, or builds from source on Linux. No separate Z3 install needed.
+On first run, z39 auto-provisions Z3: it downloads the official binary on macOS/Windows, or builds from source on Linux. No separate Z3 install needed.
 
 ### Build from source
 
@@ -47,29 +29,25 @@ On first run, z39 will auto-provision Z3: it downloads the official binary on ma
 
 This builds z39 for all supported platforms and bundles Z3 automatically. Each distribution package includes both `z39` and `z3` in the same directory.
 
-### Configure MCP
+### Z3 discovery order
 
-Add to your `.mcp.json` or MCP client config:
+`solver::find_or_download_z3` resolves in this order:
+1. `Z3_BIN` env var
+2. A `z3` binary sibling next to the running `z39` binary (how the `./build` release archives work)
+3. `~/.local/share/z39/z3` (auto-downloaded cache)
+4. `PATH`
+5. Fall back to downloading (macOS/Windows) or building from source (Linux)
 
-```json
-{
-  "mcpServers": {
-    "z39": {
-      "type": "stdio",
-      "command": "z39"
-    }
-  }
-}
-```
+---
 
-z39 finds z3 automatically: same directory as the z39 binary, `Z3_BIN` env var, `~/.local/share/z39/z3` (auto-downloaded), or PATH.
+## CLI
 
-## Examples
+All subcommands that run Z3 accept a payload positionally, via `--file <path>`, or via `-` for stdin. The `mcp` subcommand starts the MCP server and takes no payload.
 
-### Scheduling: "Can I fit these tasks?"
+### `z39 schedule` — Is this schedule feasible?
 
-```json
-{
+```bash
+z39 schedule '{
   "tasks": [
     {"name": "standup", "duration": 30},
     {"name": "deep_work", "duration": 120},
@@ -82,10 +60,9 @@ z39 finds z3 automatically: same directory as the z39 binary, `Z3_BIN` env var, 
     {"type": "before", "a": "standup", "b": "deep_work"},
     {"type": "start_after", "task": "lunch", "time": 720}
   ]
-}
+}'
 ```
 
-Result:
 ```
 feasible
 standup 09:30-10:00
@@ -94,56 +71,157 @@ lunch 12:00-13:00
 review 13:00-13:45
 ```
 
-### Logic: "Find a counterexample"
+| Flag | Default | Description |
+|------|---------|-------------|
+| `<INPUT>` / `--file` / `-` | — | JSON payload |
+| `--timeout` | 30 | Solver timeout (seconds) |
 
-```json
-{
+### `z39 logic` — Verify boolean logic
+
+```bash
+z39 logic '{
   "description": "Is (x AND y) the same as (x OR y)?",
   "check": {
     "type": "find_counterexample",
     "vars": ["x:Bool", "y:Bool"],
     "condition": "(and x y)"
   }
-}
+}'
+# → counterexample: x=false y=true
 ```
 
-Result:
-```
-counterexample: x=false y=true
+Check types: `always_true`, `equivalent`, `find_counterexample`, `consistent`, `find_satisfying`.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `<INPUT>` / `--file` / `-` | — | JSON payload |
+| `--timeout` | 30 | Solver timeout (seconds) |
+
+### `z39 config` — Validate configuration constraints
+
+```bash
+z39 config --file deployment_rules.json
 ```
 
-### Safety: "Can I delete /etc/passwd?"
+Modes: `validate`, `find_valid`, `find_violation`. Var types: `bool`, `int {min,max}`, `enum`.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `<INPUT>` / `--file` / `-` | — | JSON payload |
+| `--timeout` | 15 | Solver timeout (seconds) |
+
+### `z39 safety` — Pre-check an action
+
+Purely Rust-side (doesn't invoke Z3). Useful from shell hooks before an agent runs a tool.
+
+```bash
+z39 safety '{
+  "action": {"kind": "file_delete", "target": "/etc/passwd", "destructive": true},
+  "protected": ["/etc", "/var", "/boot"]
+}'
+# → unsafe — BLOCKED: '/etc/passwd' is a protected resource and the action is destructive
+```
+
+Action kinds: `file_read`, `file_write`, `file_delete`, `command_exec`, `network_request`, `send_message`.
+
+### `z39 solve` — Raw SMT-LIB2
+
+```bash
+z39 solve '(declare-const x Int)(assert (> x 5))(assert (< x 10))(check-sat)(get-model)'
+# → sat x=6 0.0s
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `<FORMULA>` / `--file` / `-` | — | SMT-LIB2 formula |
+| `--timeout` | 30 | Solver timeout (seconds) |
+
+### `z39 mcp` — Start the MCP server
+
+```bash
+z39 mcp
+```
+
+STDIO transport. Normally invoked by an MCP client, not a human. See the MCP section below.
+
+---
+
+## MCP Server
+
+`z39 mcp` starts the MCP server over STDIO. It exposes all the domain tools from the CLI **plus** async solve tools that only make sense inside a long-lived MCP session.
+
+### Configuration
 
 ```json
 {
-  "action": {"kind": "file_delete", "target": "/etc/passwd", "destructive": true},
-  "protected": ["/etc", "/var", "/boot"]
+  "mcpServers": {
+    "z39": {
+      "type": "stdio",
+      "command": "z39",
+      "args": ["mcp"]
+    }
+  }
 }
 ```
 
-Result:
-```
-unsafe: '/etc/passwd' is a protected resource and the action is destructive
-```
+z39 finds z3 automatically: same directory as the z39 binary, `Z3_BIN` env var, `~/.local/share/z39/z3` (auto-downloaded), or PATH.
 
-## Output Format
+### Tools
 
-z39 uses token-optimized compact output:
-- `sat x=1 y=1 8.2s` satisfiable with model and time
-- `unsat 0.3s` unsatisfiable (no solution)
-- `valid 0.3s` proven always true
-- `timeout 30.0s` Z3 timed out
+#### Domain-specific
+
+| Tool | Human question | What Z3 does |
+|------|----------------|---------------|
+| `z39_schedule` | "Can I fit 5 meetings + lunch in my day?" | Scheduling with ordering, overlap, time-window constraints |
+| `z39_logic` | "Are these access rules equivalent?" / "Find me a counterexample" | Boolean-logic verification, equivalence, consistency |
+| `z39_config` | "Do these deployment rules conflict?" | Configuration validation, constraint satisfaction |
+| `z39_safety` | "Is it safe to delete /etc/passwd?" | Pre-check actions against protected resources |
+
+#### Low-level (advanced)
+
+| Tool | Purpose |
+|------|---------|
+| `z39_solve` | Raw SMT-LIB2 → compact result |
+| `z39_solve_async` | Long-running solve (returns `job_id`) |
+| `z39_job_status` | Poll async job |
+| `z39_job_result` | Get async job result |
+| `z39_job_cancel` | Cancel async job |
+
+Async jobs live in memory for the lifetime of the MCP server process. They are not exposed from the CLI because each CLI invocation is a fresh process.
+
+## Output format
+
+Token-optimized compact output:
+
+| Status | Example |
+|--------|---------|
+| satisfiable | `sat x=1 y=1 8.2s` |
+| unsatisfiable | `unsat 0.3s` |
+| proven always true | `valid 0.3s` |
+| timeout | `timeout 30.0s` |
+| scheduling | `feasible\n<schedule>` / `infeasible — ...` |
+| safety | `safe — OK: ...` / `unsafe — BLOCKED: ...` |
 
 ## Architecture
 
 ```
-Human intent → AI translates to constraints → z39 encodes to SMT-LIB2 → Z3 solves → AI explains
+Human intent
+  → AI translates to constraints
+    → z39 encodes to SMT-LIB2
+      → Z3 solves (subprocess)
+        → AI explains
 ```
 
-- Subprocess model: Z3 runs as async subprocess (no FFI, no linking, crash isolation)
-- Async jobs: long-running solves return job_id for polling
-- turbomcp 3.x: modern Rust MCP SDK with `#[server]` and `#[tool]` macros
-- Compact output: token-optimized for LLM consumption
+- Subprocess model: Z3 runs as async subprocess (no FFI, no linking, crash isolation).
+- turbomcp 3.x: Rust MCP SDK with `#[server]` and `#[tool]` macros.
+- clap derive: CLI surface.
+- Single Tokio runtime: shared between CLI solves and MCP server.
+
+## Environment
+
+| Variable | Purpose |
+|----------|---------|
+| `Z3_BIN` | Override Z3 binary path. Otherwise looked up next to `z39`, in the auto-download cache, or on `PATH`. |
 
 ## License
 

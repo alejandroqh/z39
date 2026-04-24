@@ -147,3 +147,13 @@ fn format_kind(kind: &ActionKind) -> &'static str {
         ActionKind::SendMessage => "message",
     }
 }
+
+pub fn run(payload: &str) -> Result<String, serde_json::Error> {
+    let req: SafetyCheckRequest = serde_json::from_str(payload)?;
+    let verdict = interpret_safety(&req, None);
+    Ok(if verdict.safe {
+        format!("safe — {}", verdict.reason)
+    } else {
+        format!("unsafe — {}", verdict.reason)
+    })
+}

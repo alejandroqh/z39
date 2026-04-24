@@ -116,3 +116,14 @@ pub fn interpret_config(req: &ConfigCheckRequest, is_unsat: bool, model: Option<
         }
     }
 }
+
+pub async fn run(
+    z3_bin: &std::path::PathBuf,
+    payload: &str,
+    timeout_secs: u64,
+) -> Result<String, serde_json::Error> {
+    let req: ConfigCheckRequest = serde_json::from_str(payload)?;
+    let smt = encode_config(&req);
+    let result = crate::solver::solve(z3_bin, &smt, timeout_secs).await;
+    Ok(interpret_config(&req, result.is_unsat(), result.model.as_deref()))
+}

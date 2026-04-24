@@ -157,3 +157,21 @@ fn format_time(minutes: i32) -> String {
     let m = minutes % 60;
     format!("{:02}:{:02}", h, m)
 }
+
+pub async fn run(
+    z3_bin: &std::path::PathBuf,
+    payload: &str,
+    timeout_secs: u64,
+) -> Result<String, serde_json::Error> {
+    let req: ScheduleRequest = serde_json::from_str(payload)?;
+    let smt = encode_schedule(&req);
+    let result = crate::solver::solve(z3_bin, &smt, timeout_secs).await;
+    if result.is_sat() {
+        let schedule = parse_schedule(&result.raw_output, &req.tasks);
+        Ok(format!("feasible\n{schedule}"))
+    } else if result.is_unsat() {
+        Ok("infeasible — constraints conflict, no valid schedule exists".to_string())
+    } else {
+        Ok(result.to_compact())
+    }
+}

@@ -1,176 +1,138 @@
-use turbomcp::prelude::*;
+use std::io::Read;
 use std::path::PathBuf;
-use std::sync::Arc;
 
-mod domains;
-mod job;
-mod solver;
+use anyhow::Context;
+use clap::{Parser, Subcommand};
 
-#[derive(Clone)]
-struct Z39Server {
-    z3_bin: PathBuf,
-    job_manager: Arc<job::JobManager>,
+use z39::{domains, solver};
+
+#[derive(Parser)]
+#[command(
+    name = "z39",
+    version,
+    about = "Z3-powered reasoning for AI agents — scheduling, logic, config, safety. Single binary: CLI by default, MCP server with `z39 mcp`."
+)]
+struct Cli {
+    #[command(subcommand)]
+    command: Command,
 }
 
-#[server(name = "z39", version = "1.0.0", description = "Z3-powered reasoning for AI agents — scheduling, logic, config, safety")]
-impl Z39Server {
-    #[tool(description = "Check if a schedule is feasible. Describe tasks with durations, time windows, and ordering/overlap constraints. Returns a valid schedule or reports conflicts.")]
-    async fn z39_schedule(
-        &self,
-        #[description("JSON: {tasks:[{name,duration}],slot_start,slot_end,constraints}")]
-        schedule: String,
-    ) -> McpResult<String> {
-        let req: domains::schedule::ScheduleRequest = serde_json::from_str(&schedule)
-            .map_err(|e| McpError::invalid_params(format!("invalid schedule JSON: {e}")))?;
+#[derive(Subcommand)]
+enum Command {
+    /// Check if a schedule is feasible. Input JSON: {tasks:[{name,duration}],slot_start,slot_end,constraints}
+    Schedule {
+        /// JSON payload. Use "-" to read from stdin, or omit and pass --file
+        input: Option<String>,
+        /// Read JSON from file
+        #[arg(long, short = 'f')]
+        file: Option<PathBuf>,
+        /// Solver timeout in seconds
+        #[arg(long, default_value = "30")]
+        timeout: u64,
+    },
+    /// Verify boolean logic. Input JSON: {description,check:{type,vars,condition/expr_a/expr_b/rules/conditions}}
+    Logic {
+        input: Option<String>,
+        #[arg(long, short = 'f')]
+        file: Option<PathBuf>,
+        #[arg(long, default_value = "30")]
+        timeout: u64,
+    },
+    /// Validate configuration constraints. Input JSON: {vars:[{name,var_type,allowed_values}],rules,mode}
+    Config {
+        input: Option<String>,
+        #[arg(long, short = 'f')]
+        file: Option<PathBuf>,
+        #[arg(long, default_value = "15")]
+        timeout: u64,
+    },
+    /// Pre-check an action against safety rules. Input JSON: {action:{kind,target,destructive},protected,rules}
+    Safety {
+        input: Option<String>,
+        #[arg(long, short = 'f')]
+        file: Option<PathBuf>,
+    },
+    /// Send raw SMT-LIB2 to Z3
+    Solve {
+        /// SMT-LIB2 formula. Use "-" for stdin, or omit and pass --file
+        formula: Option<String>,
+        #[arg(long, short = 'f')]
+        file: Option<PathBuf>,
+        #[arg(long, default_value = "30")]
+        timeout: u64,
+    },
+    /// Start MCP server (STDIO transport)
+    Mcp,
+}
 
-        let smt = domains::schedule::encode_schedule(&req);
-        let result = solver::solve(&self.z3_bin, &smt, 30).await;
-
-        if result.is_sat() {
-            let schedule = domains::schedule::parse_schedule(&result.raw_output, &req.tasks);
-            Ok(format!("feasible\n{schedule}"))
-        } else if result.is_unsat() {
-            Ok("infeasible — constraints conflict, no valid schedule exists".to_string())
-        } else {
-            Ok(result.to_compact())
+fn read_input(positional: Option<String>, file: Option<PathBuf>) -> anyhow::Result<String> {
+    match (positional, file) {
+        (Some(_), Some(_)) => {
+            anyhow::bail!("provide either a positional argument or --file, not both")
         }
-    }
-
-    #[tool(description = "Verify boolean logic: prove always-true, check equivalence, find counterexamples, check consistency.")]
-    async fn z39_logic(
-        &self,
-        #[description("JSON: {description,check:{type,vars,condition/expr_a/expr_b/rules/conditions}}")]
-        logic: String,
-    ) -> McpResult<String> {
-        let req: domains::logic::LogicCheckRequest = serde_json::from_str(&logic)
-            .map_err(|e| McpError::invalid_params(format!("invalid logic JSON: {e}")))?;
-
-        let smt = domains::logic::encode_logic(&req);
-        let result = solver::solve(&self.z3_bin, &smt, 30).await;
-
-        let interpretation = domains::logic::interpret_logic(
-            &req,
-            result.is_unsat(),
-            result.model.as_deref(),
-        );
-        Ok(interpretation)
-    }
-
-    #[tool(description = "Validate configuration constraints (deployment rules, resource limits, permissions). Check consistency, find valid config, or find violations.")]
-    async fn z39_config(
-        &self,
-        #[description("JSON: {vars:[{name,var_type,allowed_values}],rules,mode}")]
-        config: String,
-    ) -> McpResult<String> {
-        let req: domains::config::ConfigCheckRequest = serde_json::from_str(&config)
-            .map_err(|e| McpError::invalid_params(format!("invalid config JSON: {e}")))?;
-
-        let smt = domains::config::encode_config(&req);
-        let result = solver::solve(&self.z3_bin, &smt, 15).await;
-
-        let interpretation = domains::config::interpret_config(
-            &req,
-            result.is_unsat(),
-            result.model.as_deref(),
-        );
-        Ok(interpretation)
-    }
-
-    #[tool(description = "Pre-check an action against safety rules. Checks if action targets protected resources or is destructive.")]
-    async fn z39_safety(
-        &self,
-        #[description("JSON: {action:{kind,target,destructive},protected,rules}")]
-        safety: String,
-    ) -> McpResult<String> {
-        let req: domains::safety::SafetyCheckRequest = serde_json::from_str(&safety)
-            .map_err(|e| McpError::invalid_params(format!("invalid safety JSON: {e}")))?;
-
-        let verdict = domains::safety::interpret_safety(&req, None);
-        if verdict.safe {
-            Ok(format!("safe — {}", verdict.reason))
-        } else {
-            Ok(format!("unsafe — {}", verdict.reason))
+        (None, None) => anyhow::bail!(
+            "missing input: pass the payload as an argument, use '-' for stdin, or pass --file <path>"
+        ),
+        (_, Some(path)) => std::fs::read_to_string(&path)
+            .with_context(|| format!("reading {}", path.display())),
+        (Some(s), None) if s == "-" => {
+            let mut buf = String::new();
+            std::io::stdin()
+                .read_to_string(&mut buf)
+                .context("reading stdin")?;
+            Ok(buf)
         }
-    }
-
-    #[tool(description = "Send raw SMT-LIB2 to Z3. For advanced use when domain tools don't cover the case.")]
-    async fn z39_solve(
-        &self,
-        #[description("SMT-LIB2 formula")]
-        formula: String,
-        #[description("Timeout in seconds (default: 30)")]
-        timeout: Option<u64>,
-    ) -> McpResult<String> {
-        let t = timeout.unwrap_or(30);
-        let result = solver::solve(&self.z3_bin, &formula, t).await;
-        Ok(result.to_compact())
-    }
-
-    #[tool(description = "Submit a long-running SMT-LIB2 solve asynchronously. Returns job_id for polling.")]
-    async fn z39_solve_async(
-        &self,
-        #[description("SMT-LIB2 formula")]
-        formula: String,
-        #[description("Timeout in seconds (default: 60)")]
-        timeout: Option<u64>,
-    ) -> McpResult<String> {
-        let t = timeout.unwrap_or(60);
-        let id = self.job_manager.submit_with_bin(
-            "async_solve".to_string(),
-            formula,
-            t,
-            self.z3_bin.clone(),
-        ).await;
-        Ok(format!("pending {id}"))
-    }
-
-    #[tool(description = "Check status of an async job.")]
-    async fn z39_job_status(
-        &self,
-        #[description("Job ID from z39_solve_async")]
-        job_id: String,
-    ) -> McpResult<String> {
-        match self.job_manager.status(&job_id) {
-            Some(j) => Ok(format!("{:?} {:?}", j.status, j.label)),
-            None => Ok(format!("not_found {job_id}")),
-        }
-    }
-
-    #[tool(description = "Get the result of a completed async job.")]
-    async fn z39_job_result(
-        &self,
-        #[description("Job ID from z39_solve_async")]
-        job_id: String,
-    ) -> McpResult<String> {
-        match self.job_manager.result(&job_id) {
-            Some(r) => Ok(r),
-            None => Ok(format!("not_found {job_id}")),
-        }
-    }
-
-    #[tool(description = "Cancel a running async job.")]
-    async fn z39_job_cancel(
-        &self,
-        #[description("Job ID to cancel")]
-        job_id: String,
-    ) -> McpResult<String> {
-        if self.job_manager.cancel(&job_id).await {
-            Ok(format!("cancelled {job_id}"))
-        } else {
-            Ok(format!("not_cancellable {job_id}"))
-        }
+        (Some(s), None) => Ok(s),
     }
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let z3_bin = solver::find_or_download_z3().await?;
+    let cli = Cli::parse();
 
-    let server = Z39Server {
-        z3_bin: z3_bin.clone(),
-        job_manager: Arc::new(job::JobManager::new(z3_bin)),
-    };
+    match cli.command {
+        Command::Mcp => z39::mcp::run_mcp_stdio().await?,
 
-    server.run_stdio().await?;
+        Command::Schedule { input, file, timeout } => {
+            let payload = read_input(input, file)?;
+            let z3_bin = solver::find_or_download_z3().await?;
+            let out = domains::schedule::run(&z3_bin, &payload, timeout)
+                .await
+                .context("invalid schedule JSON")?;
+            println!("{out}");
+        }
+
+        Command::Logic { input, file, timeout } => {
+            let payload = read_input(input, file)?;
+            let z3_bin = solver::find_or_download_z3().await?;
+            let out = domains::logic::run(&z3_bin, &payload, timeout)
+                .await
+                .context("invalid logic JSON")?;
+            println!("{out}");
+        }
+
+        Command::Config { input, file, timeout } => {
+            let payload = read_input(input, file)?;
+            let z3_bin = solver::find_or_download_z3().await?;
+            let out = domains::config::run(&z3_bin, &payload, timeout)
+                .await
+                .context("invalid config JSON")?;
+            println!("{out}");
+        }
+
+        Command::Safety { input, file } => {
+            let payload = read_input(input, file)?;
+            let out = domains::safety::run(&payload).context("invalid safety JSON")?;
+            println!("{out}");
+        }
+
+        Command::Solve { formula, file, timeout } => {
+            let payload = read_input(formula, file)?;
+            let z3_bin = solver::find_or_download_z3().await?;
+            let result = solver::solve(&z3_bin, &payload, timeout).await;
+            println!("{}", result.to_compact());
+        }
+    }
+
     Ok(())
 }

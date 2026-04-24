@@ -2,12 +2,18 @@
 name = "z39"
 version = "1.0.0"
 edition = "2024"
-description = "Z3-powered reasoning for AI agents — scheduling, logic, config, safety"
+description = "Z3-powered reasoning for AI agents — scheduling, logic, config, safety. Single binary: CLI by default, MCP server with `z39 mcp`."
 authors = ["Alejandro Quintanar"]
 license = "Apache-2.0"
 repository = "https://github.com/alejandroqh/z39"
 keywords = ["z3", "smt", "solver", "mcp", "ai-agents"]
 categories = ["command-line-utilities", "development-tools"]
+
+[workspace]
+
+[[bin]]
+name = "z39"
+path = "src/main.rs"
 
 [profile.release]
 strip = true
@@ -16,6 +22,7 @@ codegen-units = 1
 panic = "abort"
 
 [dependencies]
+clap = { version = "4", features = ["derive"] }
 turbomcp = { version = "3", features = ["stdio"] }
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "process", "time", "io-std", "sync"] }
 serde = { version = "1", features = ["derive"] }

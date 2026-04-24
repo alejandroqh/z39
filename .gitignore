@@ -10,3 +10,4 @@ Cargo.lock
 *.swo
 *~
 /tmp/vendor/
+CLAUDE.md

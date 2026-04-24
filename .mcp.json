@@ -3,6 +3,7 @@
     "z39": {
       "type": "stdio",
       "command": "/home/aquintanar/workspace/z39/target/release/z39",
+      "args": ["mcp"],
       "env": {
         "Z3_BIN": "/home/aquintanar/.local/bin/z3",
         "LD_LIBRARY_PATH": "/usr/local/gcc-14.1.0/lib64"

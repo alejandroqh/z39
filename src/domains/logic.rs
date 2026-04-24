@@ -166,3 +166,14 @@ fn declare_vars(s: &mut String, vars: &[String]) {
         }
     }
 }
+
+pub async fn run(
+    z3_bin: &std::path::PathBuf,
+    payload: &str,
+    timeout_secs: u64,
+) -> Result<String, serde_json::Error> {
+    let req: LogicCheckRequest = serde_json::from_str(payload)?;
+    let smt = encode_logic(&req);
+    let result = crate::solver::solve(z3_bin, &smt, timeout_secs).await;
+    Ok(interpret_logic(&req, result.is_unsat(), result.model.as_deref()))
+}

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use anyhow::Context;
 use clap::{Parser, Subcommand};
 
-use z39::{domains, solver};
+use z39_solver::{domains, solver};
 
 #[derive(Parser)]
 #[command(
@@ -91,7 +91,7 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Command::Mcp => z39::mcp::run_mcp_stdio().await?,
+        Command::Mcp => z39_solver::mcp::run_mcp_stdio().await?,
 
         Command::Schedule { input, file, timeout } => {
             let payload = read_input(input, file)?;

@@ -253,7 +253,36 @@ The agent encodes the puzzle as SMT-LIB2 (81 `Int` cells bounded 1–9, 27 `dist
 3 2 1 | 4 9 6 | 5 7 8
 ```
 
-Solved in **0.1s**.
+Z3 solve time: **0.1s**. End-to-end with Opus 4.7 (reading the puzzle, encoding to SMT-LIB2, calling the tool, and formatting the output): **2m 17s**.
+
+## Example: planning a busy day
+
+A more everyday use. Paste into any MCP-capable agent:
+
+````
+Can I fit all of this between 9am and 6pm today?
+
+- Morning standup (30 min)
+- Deep work on the Q2 report (2 hours)
+- Lunch (45 min, sometime after noon)
+- Dentist appointment (30 min, any time from 2pm)
+- 1:1 with my manager (30 min, has to come after the report)
+- Pick up groceries (30 min)
+````
+
+The agent maps the request to `z39_schedule`, which encodes the durations, time windows, and ordering into QF_LIA and asks Z3 whether a valid arrangement exists:
+
+```
+feasible
+standup     09:00-09:30
+deep_work   09:30-11:30
+lunch       12:00-12:45
+dentist     14:00-14:30
+one_on_one  14:30-15:00
+groceries   15:00-15:30
+```
+
+If any constraint makes the day impossible (e.g. you add a 3-hour task with everything else already full), Z3 returns `infeasible` instead of the agent guessing.
 
 ## Output format
 

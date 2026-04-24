@@ -9,4 +9,4 @@ Cargo.lock
 *.swp
 *.swo
 *~
-/tmp/
+/tmp/vendor/

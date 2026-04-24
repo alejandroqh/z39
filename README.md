@@ -1,6 +1,6 @@
 # Z39 is z3-powered reasoning for AI agents
 
-[![Powered by Z3](https://img.shields.io/badge/powered%20by-Z3-blue?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHRleHQgeD0iNTAlIiB5PSI1NSUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSJ3aGl0ZSI%2BWjM8L3RleHQ%2BPC9zdmc%2B)](https://github.com/Z3Prover/z3)
+[![Powered by Z3](https://img.shields.io/badge/powered%20by-Z3-blue)](https://github.com/Z3Prover/z3)
 
 > **The missing link between LLM reasoning and formal verification.**
 

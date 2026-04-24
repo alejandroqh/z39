@@ -1,5 +1,5 @@
 [package]
-name = "z39"
+name = "z39-solver"
 version = "1.0.0"
 edition = "2024"
 description = "Z3-powered reasoning for AI agents. MCP server + CLI for scheduling, logic, config, and safety."

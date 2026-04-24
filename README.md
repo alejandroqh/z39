@@ -46,8 +46,10 @@ LLMs understand messy human language. Z3 verifies precise logical constraints. T
 ## Install
 
 ```bash
-cargo install z39
+cargo install z39-solver
 ```
+
+The crate is published as `z39-solver`; the installed binary is `z39`.
 
 On first run, z39 auto-provisions Z3: it downloads the official binary on macOS/Windows, or builds from source on Linux. No separate Z3 install needed.
 

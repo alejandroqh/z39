@@ -164,7 +164,7 @@ impl Z39Server {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let z3_bin = solver::find_z3()?;
+    let z3_bin = solver::find_or_download_z3().await?;
 
     let server = Z39Server {
         z3_bin: z3_bin.clone(),

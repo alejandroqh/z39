@@ -2,11 +2,11 @@
 
 > **The missing link between LLM reasoning and formal verification.**
 
-z39 is an MCP server that gives AI agents access to Z3's constraint solving capabilities through **domain-specific tools** — not raw SMT-LIB2.
+z39 is an MCP server that gives AI agents access to Z3's constraint solving capabilities through **domain-specific tools**, not raw SMT-LIB2.
 
 ## Why z39?
 
-LLMs understand messy human language. Z3 verifies precise logical constraints. Together they make AI agents more reliable — the agent doesn't just produce plausible answers, it can **prove** whether something is possible, impossible, equivalent, or unsafe.
+LLMs understand messy human language. Z3 verifies precise logical constraints. Together they make AI agents more reliable: the agent doesn't just produce plausible answers, it can **prove** whether something is possible, impossible, equivalent, or unsafe.
 
 ## Tools
 
@@ -23,7 +23,7 @@ LLMs understand messy human language. Z3 verifies precise logical constraints. T
 
 | Tool | Purpose |
 |------|---------|
-| `z39_solve` | Raw SMT-LIB2 → compact result |
+| `z39_solve` | Raw SMT-LIB2 to compact result |
 | `z39_solve_async` | Long-running solve (returns job_id) |
 | `z39_job_status` | Poll async job |
 | `z39_job_result` | Get async job result |
@@ -129,16 +129,16 @@ counterexample: x=false y=true
 
 Result:
 ```
-unsafe — BLOCKED: '/etc/passwd' is a protected resource and the action is destructive
+unsafe: '/etc/passwd' is a protected resource and the action is destructive
 ```
 
 ## Output Format
 
 z39 uses token-optimized compact output:
-- `sat x=1 y=1 8.2s` — satisfiable with model and time
-- `unsat 0.3s` — unsatisfiable (no solution)
-- `valid 0.3s` — proven always true
-- `timeout 30.0s` — Z3 timed out
+- `sat x=1 y=1 8.2s` satisfiable with model and time
+- `unsat 0.3s` unsatisfiable (no solution)
+- `valid 0.3s` proven always true
+- `timeout 30.0s` Z3 timed out
 
 ## Architecture
 
@@ -146,10 +146,10 @@ z39 uses token-optimized compact output:
 Human intent → AI translates to constraints → z39 encodes to SMT-LIB2 → Z3 solves → AI explains
 ```
 
-- **Subprocess model**: Z3 runs as async subprocess (no FFI, no linking, crash isolation)
-- **Async jobs**: Long-running solves return job_id for polling
-- **turbomcp 3.x**: Modern Rust MCP SDK with `#[server]` and `#[tool]` macros
-- **Compact output**: Token-optimized for LLM consumption
+- Subprocess model: Z3 runs as async subprocess (no FFI, no linking, crash isolation)
+- Async jobs: long-running solves return job_id for polling
+- turbomcp 3.x: modern Rust MCP SDK with `#[server]` and `#[tool]` macros
+- Compact output: token-optimized for LLM consumption
 
 ## License
 

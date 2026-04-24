@@ -1,0 +1,238 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# === z39 build script ===
+# Builds z39 for multiple platforms and bundles the Z3 binary.
+# For Linux targets, Z3 is built from source (statically linked with musl)
+# because official releases require glibc 2.38+.
+# For macOS, we use the official Z3 release binaries.
+
+VERSION=$(cargo metadata --no-deps --format-version 1 | python3 -c "import sys,json; print(json.load(sys.stdin)['packages'][0]['version'])")
+NAME="z39"
+OUT_DIR="dist"
+Z3_VERSION="4.16.0"
+Z3_SOURCE="https://github.com/Z3Prover/z3/archive/refs/tags/z3-${Z3_VERSION}.tar.gz"
+
+mkdir -p "$OUT_DIR"
+
+echo "=== Building $NAME v$VERSION with Z3 v$Z3_VERSION ==="
+
+# --- Download or build Z3 for each target ---
+
+build_z3_linux() {
+    local TRIPLE="$1"
+    local Z3_DIR="vendor/z3-${TRIPLE}"
+
+    if [ -x "${Z3_DIR}/z3" ]; then
+        echo "  Z3 already built for ${TRIPLE}, skipping"
+        return
+    fi
+
+    echo "  Building Z3 from source for ${TRIPLE}..."
+    mkdir -p vendor
+
+    # Download Z3 source if not present
+    if [ ! -d "vendor/z3-source" ]; then
+        echo "  Downloading Z3 source..."
+        curl -sL "$Z3_SOURCE" | tar -xz -C vendor/
+        mv "vendor/z3-z3-${Z3_VERSION}" "vendor/z3-source"
+    fi
+
+    # Build Z3 with static linking
+    local BUILD_DIR="vendor/z3-build-${TRIPLE}"
+    rm -rf "$BUILD_DIR"
+    mkdir -p "$BUILD_DIR"
+
+    cd "$BUILD_DIR"
+
+    # Configure for the target
+    if [ "$TRIPLE" = "aarch64-unknown-linux-gnu" ]; then
+        local CXX="aarch64-linux-gnu-g++"
+        local AR="aarch64-linux-gnu-ar"
+    elif [ "$TRIPLE" = "x86_64-unknown-linux-gnu" ]; then
+        local CXX="x86_64-linux-gnu-g++"
+        local AR="x86_64-linux-gnu-ar"
+    else
+        local CXX="g++"
+        local AR="ar"
+    fi
+
+    # Check if cross-compiler is available
+    if ! command -v "$CXX" &>/dev/null; then
+        echo "  WARNING: $CXX not found, skipping Z3 build for $TRIPLE"
+        cd ../..
+        return 1
+    fi
+
+    python3 ../z3-source/scripts/mk_make.py \
+        --g++="$CXX" \
+        --ar="$AR" \
+        --staticlib \
+        --prefix="/opt/z3-${TRIPLE}"
+
+    make -j"$(nproc)"
+
+    mkdir -p "../../${Z3_DIR}"
+    cp z3 "../../${Z3_DIR}/z3"
+
+    cd ../..
+    echo "  Z3 built for ${TRIPLE}"
+}
+
+download_z3_macos() {
+    local ARCH="$1"
+    local SUFFIX="$2"
+    local Z3_DIR="vendor/z3-${ARCH}"
+
+    if [ -x "${Z3_DIR}/z3" ]; then
+        echo "  Z3 already downloaded for ${ARCH}, skipping"
+        return
+    fi
+
+    local Z3_ZIP="z3-${Z3_VERSION}-${SUFFIX}-osx-15.7.3.zip"
+    local Z3_URL="https://github.com/Z3Prover/z3/releases/download/z3-${Z3_VERSION}/${Z3_ZIP}"
+
+    echo "  Downloading Z3 for macOS ${SUFFIX}..."
+    mkdir -p vendor
+
+    local TMPDIR
+    TMPDIR=$(mktemp -d)
+    curl -sL "$Z3_URL" -o "${TMPDIR}/${Z3_ZIP}"
+    unzip -o "${TMPDIR}/${Z3_ZIP}" -d "${TMPDIR}/z3out"
+
+    mkdir -p "${Z3_DIR}"
+    # Find the z3 binary in the extracted directory
+    local Z3_BIN
+    Z3_BIN=$(find "${TMPDIR}/z3out" -name "z3" -type f | head -1)
+    if [ -z "$Z3_BIN" ]; then
+        echo "  ERROR: z3 binary not found in ${Z3_ZIP}"
+        rm -rf "${TMPDIR}"
+        return 1
+    fi
+    cp "$Z3_BIN" "${Z3_DIR}/z3"
+    chmod +x "${Z3_DIR}/z3"
+
+    rm -rf "${TMPDIR}"
+    echo "  Z3 downloaded for macOS ${SUFFIX}"
+}
+
+download_z3_windows() {
+    local ARCH="$1"
+    local SUFFIX="$2"
+    local Z3_DIR="vendor/z3-${ARCH}"
+
+    if [ -x "${Z3_DIR}/z3.exe" ]; then
+        echo "  Z3 already downloaded for Windows ${SUFFIX}, skipping"
+        return
+    fi
+
+    local Z3_ZIP="z3-${Z3_VERSION}-${SUFFIX}-win.zip"
+    local Z3_URL="https://github.com/Z3Prover/z3/releases/download/z3-${Z3_VERSION}/${Z3_ZIP}"
+
+    echo "  Downloading Z3 for Windows ${SUFFIX}..."
+    mkdir -p vendor
+
+    local TMPDIR
+    TMPDIR=$(mktemp -d)
+    curl -sL "$Z3_URL" -o "${TMPDIR}/${Z3_ZIP}"
+    unzip -o "${TMPDIR}/${Z3_ZIP}" -d "${TMPDIR}/z3out"
+
+    mkdir -p "${Z3_DIR}"
+    local Z3_BIN
+    Z3_BIN=$(find "${TMPDIR}/z3out" -name "z3.exe" -type f | head -1)
+    if [ -z "$Z3_BIN" ]; then
+        echo "  ERROR: z3.exe not found in ${Z3_ZIP}"
+        rm -rf "${TMPDIR}"
+        return 1
+    fi
+    cp "$Z3_BIN" "${Z3_DIR}/z3.exe"
+    # Also copy libz3 dll
+    local Z3_DLL
+    Z3_DLL=$(find "${TMPDIR}/z3out" -name "libz3.dll" -type f | head -1)
+    [ -n "$Z3_DLL" ] && cp "$Z3_DLL" "${Z3_DIR}/"
+
+    rm -rf "${TMPDIR}"
+    echo "  Z3 downloaded for Windows ${SUFFIX}"
+}
+
+# --- Build z39 for each platform ---
+
+# macOS ARM64 (native)
+echo ""
+echo "--- macOS arm64 (aarch64-apple-darwin) ---"
+download_z3_macos "aarch64-apple-darwin" "arm64"
+cargo build --release --target aarch64-apple-darwin
+mkdir -p "$OUT_DIR/z39-macos-arm64"
+cp target/aarch64-apple-darwin/release/$NAME "$OUT_DIR/z39-macos-arm64/"
+cp vendor/z3-aarch64-apple-darwin/z3 "$OUT_DIR/z39-macos-arm64/"
+echo "  -> $OUT_DIR/z39-macos-arm64/"
+
+# macOS x86_64 (cross-compile)
+echo ""
+echo "--- macOS x64 (x86_64-apple-darwin) ---"
+download_z3_macos "x86_64-apple-darwin" "x64"
+cargo build --release --target x86_64-apple-darwin
+mkdir -p "$OUT_DIR/z39-macos-x64"
+cp target/x86_64-apple-darwin/release/$NAME "$OUT_DIR/z39-macos-x64/"
+cp vendor/z3-x86_64-apple-darwin/z3 "$OUT_DIR/z39-macos-x64/"
+echo "  -> $OUT_DIR/z39-macos-x64/"
+
+# Linux ARM64 (cross-compile)
+echo ""
+echo "--- Linux arm64 (aarch64-unknown-linux-gnu) ---"
+if build_z3_linux "aarch64-unknown-linux-gnu"; then
+    cargo zigbuild --release --target aarch64-unknown-linux-gnu
+    mkdir -p "$OUT_DIR/z39-linux-arm64"
+    cp target/aarch64-unknown-linux-gnu/release/$NAME "$OUT_DIR/z39-linux-arm64/"
+    cp vendor/z3-aarch64-unknown-linux-gnu/z3 "$OUT_DIR/z39-linux-arm64/"
+    echo "  -> $OUT_DIR/z39-linux-arm64/"
+else
+    echo "  SKIPPED: cross-compiler not available"
+fi
+
+# Linux x86_64 (cross-compile)
+echo ""
+echo "--- Linux x64 (x86_64-unknown-linux-gnu) ---"
+if build_z3_linux "x86_64-unknown-linux-gnu"; then
+    cargo zigbuild --release --target x86_64-unknown-linux-gnu
+    mkdir -p "$OUT_DIR/z39-linux-x64"
+    cp target/x86_64-unknown-linux-gnu/release/$NAME "$OUT_DIR/z39-linux-x64/"
+    cp vendor/z3-x86_64-unknown-linux-gnu/z3 "$OUT_DIR/z39-linux-x64/"
+    echo "  -> $OUT_DIR/z39-linux-x64/"
+else
+    echo "  SKIPPED: cross-compiler not available"
+fi
+
+# Windows x64
+echo ""
+echo "--- Windows x64 ---"
+download_z3_windows "x86_64-pc-windows-msvc" "x64"
+cargo build --release --target x86_64-pc-windows-msvc 2>/dev/null || {
+    echo "  SKIPPED: Windows cross-compile not available"
+}
+if [ -f "target/x86_64-pc-windows-msvc/release/$NAME.exe" ]; then
+    mkdir -p "$OUT_DIR/z39-windows-x64"
+    cp target/x86_64-pc-windows-msvc/release/$NAME.exe "$OUT_DIR/z39-windows-x64/"
+    cp vendor/z3-x86_64-pc-windows-msvc/z3.exe "$OUT_DIR/z39-windows-x64/"
+    cp vendor/z3-x86_64-pc-windows-msvc/libz3.dll "$OUT_DIR/z39-windows-x64/" 2>/dev/null || true
+    echo "  -> $OUT_DIR/z39-windows-x64/"
+fi
+
+# --- Create distribution archives ---
+echo ""
+echo "=== Creating archives ==="
+cd "$OUT_DIR"
+for dir in z39-*/; do
+    PLATFORM="${dir%/}"
+    echo "  ${PLATFORM}.tar.gz"
+    tar -czf "${PLATFORM}.tar.gz" "${PLATFORM}/"
+done
+cd ..
+
+echo ""
+echo "=== Done ==="
+echo "Distribution packages:"
+ls -lh "$OUT_DIR"/*.tar.gz 2>/dev/null || echo "  (no archives created)"
+echo ""
+echo "Individual binaries:"
+ls -lh "$OUT_DIR"/z39-*/z39* 2>/dev/null || echo "  (no binaries created)"

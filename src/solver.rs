@@ -6,20 +6,35 @@ use tokio::time::{timeout, Duration};
 use anyhow::Result;
 
 /// Find the z3 binary
+/// Search order:
+/// 1. Z3_BIN env var
+/// 2. Same directory as the z39 binary (distribution layout)
+/// 3. PATH lookup
 pub fn find_z3() -> anyhow::Result<PathBuf> {
+    // 1. Z3_BIN env var
     if let Ok(p) = std::env::var("Z3_BIN") {
         let pb = PathBuf::from(&p);
         if pb.exists() { return Ok(pb); }
     }
-    for c in ["build/z3", "build/release/z3", "build/debug/z3"] {
-        let p = PathBuf::from(c);
-        if p.exists() { return Ok(p); }
+
+    // 2. Same directory as the z39 binary (distribution layout)
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let z3_next_to_exe = dir.join("z3");
+            if z3_next_to_exe.exists() { return Ok(z3_next_to_exe); }
+            // Windows
+            let z3_exe = dir.join("z3.exe");
+            if z3_exe.exists() { return Ok(z3_exe); }
+        }
     }
+
+    // 3. PATH lookup
     for dir in std::env::var("PATH").unwrap_or_default().split(':') {
         let p = PathBuf::from(dir).join("z3");
         if p.exists() { return Ok(p); }
     }
-    anyhow::bail!("z3 not found: install z3, set Z3_BIN, or add to PATH")
+
+    anyhow::bail!("z3 not found: install z3, set Z3_BIN, or place z3 binary next to z39")
 }
 
 #[derive(Debug, Clone, PartialEq)]

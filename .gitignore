@@ -10,4 +10,5 @@ Cargo.lock
 *.swo
 *~
 /tmp/vendor/
+/dist/
 CLAUDE.md

@@ -2,7 +2,7 @@
 name = "z39"
 version = "1.0.0"
 edition = "2024"
-description = "Z3-powered reasoning for AI agents — scheduling, logic, config, safety. Single binary: CLI by default, MCP server with `z39 mcp`."
+description = "Z3-powered reasoning for AI agents. MCP server + CLI for scheduling, logic, config, and safety."
 authors = ["Alejandro Quintanar"]
 license = "Apache-2.0"
 repository = "https://github.com/alejandroqh/z39"

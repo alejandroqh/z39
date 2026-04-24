@@ -1,8 +1,10 @@
-# Z39 is z3-powered reasoning for AI agents
+# z39
 
 [![Powered by Z3](https://img.shields.io/badge/powered%20by-Z3-blue)](https://github.com/Z3Prover/z3)
 
-> **The missing link between LLM reasoning and formal verification.**
+**Z3-powered reasoning for AI agents. MCP server + CLI for scheduling, logic, config, and safety.**
+
+> The missing link between LLM reasoning and formal verification.
 
 <details open>
 <summary><b>Plain English</b></summary>

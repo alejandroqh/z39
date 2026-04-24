@@ -51,6 +51,14 @@ cargo install z39-solver
 
 The crate is published as `z39-solver`; the installed binary is `z39`.
 
+### Install for any AI CLI / IDE
+
+Installs the binary and auto-configures it for every MCP client detected: **Claude Code**, **Claude Desktop**, **Codex**, **OpenCode**, **OpenClaw**.
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/alejandroqh/marketplace/main/h39.sh | bash
+```
+
 On first run, z39 auto-provisions Z3: it downloads the official binary on macOS/Windows, or builds from source on Linux. No separate Z3 install needed.
 
 ### Build from source

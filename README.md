@@ -284,6 +284,38 @@ groceries   15:00-15:30
 
 If any constraint makes the day impossible (e.g. you add a 3-hour task with everything else already full), Z3 returns `infeasible` instead of the agent guessing.
 
+## Example: who sits where at dinner
+
+A real headache the moment you have more than a few guests. Humans can't reliably hold 8 people plus a handful of adjacency rules in their head; LLMs produce confident-looking seating charts that quietly violate a constraint. Z3 solves it instantly.
+
+Paste into any MCP-capable agent:
+
+````
+Work out a seating order for 8 guests at a long table (seats 1–8):
+
+- Alice and Bob are a couple → they must sit next to each other
+- Carol and Dave just broke up → they must NOT sit next to each other
+- Eve gets anxious in the middle → she needs an end seat (1 or 8)
+- Frank and Grace are siblings → parents asked they sit together
+- Henry and Bob have a work beef → they must NOT sit next to each other
+- Dave is hosting → he sits somewhere in the middle, not at either end
+````
+
+The agent encodes positions as integers 1–8, adjacency as `|pos_a − pos_b| = 1`, and calls `z39_solve`. Z3 returns a valid assignment:
+
+```
+Seat 1: Eve
+Seat 2: Carol
+Seat 3: Bob
+Seat 4: Alice
+Seat 5: Dave
+Seat 6: Frank
+Seat 7: Grace
+Seat 8: Henry
+```
+
+Z3 solve time: ~10ms. If you added one more rule that made the whole thing impossible (say, Henry also must sit next to Eve), Z3 would return `unsat` and the agent would tell you flat out that no arrangement exists — instead of inventing one that looks plausible.
+
 ## Output format
 
 Token-optimized compact output:

@@ -106,7 +106,7 @@ pub fn encode_safety(req: &SafetyCheckRequest) -> String {
     s
 }
 
-pub fn interpret_safety(req: &SafetyCheckRequest, model: Option<&str>) -> SafetyVerdict {
+pub fn interpret_safety(req: &SafetyCheckRequest) -> SafetyVerdict {
     let target_protected = req.protected.iter().any(|p| req.action.target.contains(p));
     let destructive = req.action.destructive;
 
@@ -150,7 +150,7 @@ fn format_kind(kind: &ActionKind) -> &'static str {
 
 pub fn run(payload: &str) -> Result<String, serde_json::Error> {
     let req: SafetyCheckRequest = serde_json::from_str(payload)?;
-    let verdict = interpret_safety(&req, None);
+    let verdict = interpret_safety(&req);
     Ok(if verdict.safe {
         format!("safe — {}", verdict.reason)
     } else {

@@ -7,7 +7,7 @@ use crate::{domains, job, solver};
 // Compile-time check: MCP server version must match Cargo.toml
 const _: () = {
     let cargo = env!("CARGO_PKG_VERSION").as_bytes();
-    let mcp = b"1.0.0";
+    let mcp = b"1.0.1";
     assert!(
         cargo.len() == mcp.len(),
         "MCP server version does not match Cargo.toml — update #[server(version)] below"
@@ -30,7 +30,7 @@ struct Z39Server {
 
 #[server(
     name = "z39",
-    version = "1.0.0",
+    version = "1.0.1",
     description = "Z3-powered reasoning for AI agents — scheduling, logic, config, safety"
 )]
 impl Z39Server {

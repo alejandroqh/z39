@@ -44,33 +44,6 @@ impl JobManager {
     #[allow(dead_code)]
     pub fn z3_bin(&self) -> &PathBuf { &self.z3_bin }
 
-    /// Submit and immediately start an async solve job
-    #[allow(dead_code)]
-    pub async fn submit(&self, label: String, smt_input: String, timeout_secs: u64) -> String {
-        let id = uuid::Uuid::new_v4().to_string()[..8].to_string();
-
-        let job = Job {
-            id: id.clone(),
-            status: JobStatus::Running,
-            label,
-            result: None,
-            duration_ms: None,
-        };
-        self.jobs.insert(id.clone(), job);
-
-        let jobs = self.jobs.clone();
-        let jid = id.clone();
-
-        let handle = tokio::spawn(async move {
-            let result = solver::solve(&jobs.get(&jid).map(|_| PathBuf::new()).unwrap_or_default(), &smt_input, timeout_secs).await;
-            // ^ We need the real z3_bin here, fix below
-        });
-
-        let mut handles = self.handles.lock().await;
-        handles.push((id.clone(), handle));
-        id
-    }
-
     pub async fn submit_with_bin(&self, label: String, smt_input: String, timeout_secs: u64, z3_bin: PathBuf) -> String {
         let id = uuid::Uuid::new_v4().to_string()[..8].to_string();
 

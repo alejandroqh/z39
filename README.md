@@ -1,5 +1,7 @@
 # Z39 is z3-powered reasoning for AI agents
 
+[![Powered by Z3](https://img.shields.io/badge/powered%20by-Z3-blue?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHRleHQgeD0iNTAlIiB5PSI1NSUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSJ3aGl0ZSI%2BWjM8L3RleHQ%2BPC9zdmc%2B)](https://github.com/Z3Prover/z3)
+
 > **The missing link between LLM reasoning and formal verification.**
 
 <details open>
@@ -12,14 +14,14 @@ z39 helps AI assistants answer tricky yes-or-no questions with certainty instead
 <details>
 <summary><b>For developers</b></summary>
 
-z39 is a single Rust binary that bundles a CLI and an MCP server over the Z3 solver. Call it from a shell script or drop it into an MCP config — structured JSON in, compact answers out. No daemon, no FFI, no separate Z3 install.
+z39 is a single Rust binary that bundles a CLI and an MCP server over the Z3 solver. Call it from a shell script or drop it into an MCP config: structured JSON in, compact answers out. No daemon, no FFI, no separate Z3 install.
 
 </details>
 
 <details>
 <summary><b>For formal methods readers</b></summary>
 
-z39 exposes Z3 through four domain encoders — scheduling, boolean logic, configuration, and safety — each translating structured inputs into SMT-LIB2 (QF_LIA / QF_LRA / QF_UF) and interpreting models back into domain language. Decision problems framed as satisfiability: feasible / infeasible, valid / counterexample, consistent / conflicting.
+z39 exposes Z3 through four domain encoders (scheduling, boolean logic, configuration, and safety), each translating structured inputs into SMT-LIB2 (QF_LIA / QF_LRA / QF_UF) and interpreting models back into domain language. Decision problems framed as satisfiability: feasible / infeasible, valid / counterexample, consistent / conflicting.
 
 </details>
 
@@ -34,7 +36,7 @@ z39 is a Rust CLI + stdio MCP server that marshals typed JSON into SMT-LIB2, spa
 
 LLMs understand messy human language. Z3 verifies precise logical constraints. Together they make AI agents more reliable: the agent doesn't just produce plausible answers, it can **prove** whether something is possible, impossible, equivalent, or unsafe.
 
-- **CLI for scripting**: `z39 schedule`, `z39 logic`, `z39 config`, `z39 safety`, `z39 solve` — one-shot invocations from a shell, Makefile, or test harness.
+- **CLI for scripting**: `z39 schedule`, `z39 logic`, `z39 config`, `z39 safety`, `z39 solve`. One-shot invocations from a shell, Makefile, or test harness.
 - **MCP server on demand**: `z39 mcp` starts the MCP server over STDIO. No daemon between calls.
 - **Single binary, auto-provisioned Z3**: ships one executable. Z3 is downloaded automatically on first run if it isn't already installed.
 - **Subprocess isolation**: Z3 runs as a spawned subprocess (no FFI, no linking, crash-contained).
@@ -70,7 +72,7 @@ This builds z39 for all supported platforms and bundles Z3 automatically. Each d
 
 All subcommands that run Z3 accept a payload positionally, via `--file <path>`, or via `-` for stdin. The `mcp` subcommand starts the MCP server and takes no payload.
 
-### `z39 schedule` — Is this schedule feasible?
+### `z39 schedule`: Is this schedule feasible?
 
 ```bash
 z39 schedule '{
@@ -99,10 +101,10 @@ review 13:00-13:45
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `<INPUT>` / `--file` / `-` | — | JSON payload |
+| `<INPUT>` / `--file` / `-` | required | JSON payload |
 | `--timeout` | 30 | Solver timeout (seconds) |
 
-### `z39 logic` — Verify boolean logic
+### `z39 logic`: Verify boolean logic
 
 ```bash
 z39 logic '{
@@ -120,10 +122,10 @@ Check types: `always_true`, `equivalent`, `find_counterexample`, `consistent`, `
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `<INPUT>` / `--file` / `-` | — | JSON payload |
+| `<INPUT>` / `--file` / `-` | required | JSON payload |
 | `--timeout` | 30 | Solver timeout (seconds) |
 
-### `z39 config` — Validate configuration constraints
+### `z39 config`: Validate configuration constraints
 
 ```bash
 z39 config --file deployment_rules.json
@@ -133,10 +135,10 @@ Modes: `validate`, `find_valid`, `find_violation`. Var types: `bool`, `int {min,
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `<INPUT>` / `--file` / `-` | — | JSON payload |
+| `<INPUT>` / `--file` / `-` | required | JSON payload |
 | `--timeout` | 15 | Solver timeout (seconds) |
 
-### `z39 safety` — Pre-check an action
+### `z39 safety`: Pre-check an action
 
 Purely Rust-side (doesn't invoke Z3). Useful from shell hooks before an agent runs a tool.
 
@@ -150,7 +152,7 @@ z39 safety '{
 
 Action kinds: `file_read`, `file_write`, `file_delete`, `command_exec`, `network_request`, `send_message`.
 
-### `z39 solve` — Raw SMT-LIB2
+### `z39 solve`: Raw SMT-LIB2
 
 ```bash
 z39 solve '(declare-const x Int)(assert (> x 5))(assert (< x 10))(check-sat)(get-model)'
@@ -159,10 +161,10 @@ z39 solve '(declare-const x Int)(assert (> x 5))(assert (< x 10))(check-sat)(get
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `<FORMULA>` / `--file` / `-` | — | SMT-LIB2 formula |
+| `<FORMULA>` / `--file` / `-` | required | SMT-LIB2 formula |
 | `--timeout` | 30 | Solver timeout (seconds) |
 
-### `z39 mcp` — Start the MCP server
+### `z39 mcp`: Start the MCP server
 
 ```bash
 z39 mcp

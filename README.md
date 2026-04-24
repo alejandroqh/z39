@@ -217,6 +217,44 @@ z39 finds z3 automatically: same directory as the z39 binary, `Z3_BIN` env var, 
 
 Async jobs live in memory for the lifetime of the MCP server process. They are not exposed from the CLI because each CLI invocation is a fresh process.
 
+## Example: solving a Sudoku
+
+With `z39` configured as an MCP server, paste this prompt into any MCP-capable agent:
+
+````
+Solve this Sudoku using z39:
+
+2 . 5 | . . 7 | . . 6
+4 . . | 9 6 . | . 2 .
+. . . | . 8 . | . 4 5
+------+-------+------
+9 8 . | . 7 4 | . . .
+5 7 . | 8 . 2 | . 6 9
+. . . | 6 3 . | . 5 7
+------+-------+------
+7 5 . | . 2 . | . . .
+. 6 . | . 5 1 | . . 2
+3 . . | 4 . . | 5 . 8
+````
+
+The agent encodes the puzzle as SMT-LIB2 (81 `Int` cells bounded 1–9, 27 `distinct` constraints for rows/columns/boxes, plus equality for each given) and calls `z39_solve`. Z3 returns the unique model:
+
+```
+2 3 5 | 1 4 7 | 9 8 6
+4 1 8 | 9 6 5 | 7 2 3
+6 9 7 | 2 8 3 | 1 4 5
+------+-------+------
+9 8 6 | 5 7 4 | 2 3 1
+5 7 3 | 8 1 2 | 4 6 9
+1 4 2 | 6 3 9 | 8 5 7
+------+-------+------
+7 5 9 | 3 2 8 | 6 1 4
+8 6 4 | 7 5 1 | 3 9 2
+3 2 1 | 4 9 6 | 5 7 8
+```
+
+Solved in **0.1s**.
+
 ## Output format
 
 Token-optimized compact output:

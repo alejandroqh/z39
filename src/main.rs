@@ -12,7 +12,7 @@ struct Z39Server {
     job_manager: Arc<job::JobManager>,
 }
 
-#[server(name = "z39", version = "0.1.0", description = "Z3-powered reasoning for AI agents — scheduling, logic, config, safety")]
+#[server(name = "z39", version = "1.0.0", description = "Z3-powered reasoning for AI agents — scheduling, logic, config, safety")]
 impl Z39Server {
     #[tool(description = "Check if a schedule is feasible. Describe tasks with durations, time windows, and ordering/overlap constraints. Returns a valid schedule or reports conflicts.")]
     async fn z39_schedule(

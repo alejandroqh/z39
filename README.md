@@ -1,4 +1,4 @@
-# z39 — Z3-powered reasoning for AI agents
+# Z39 is z3-powered reasoning for AI agents
 
 > **The missing link between LLM reasoning and formal verification.**
 

@@ -31,13 +31,21 @@ LLMs understand messy human language. Z3 verifies precise logical constraints. T
 
 ## Quick Start
 
-### Build
+### Install
+
+```bash
+cargo install z39
+```
+
+On first run, z39 will auto-provision Z3: it downloads the official binary on macOS/Windows, or builds from source on Linux. No separate Z3 install needed.
+
+### Build from source
 
 ```bash
 ./build
 ```
 
-This builds z39 for all supported platforms and downloads/builds Z3 automatically. Each distribution package includes both `z39` and `z3` in the same directory.
+This builds z39 for all supported platforms and bundles Z3 automatically. Each distribution package includes both `z39` and `z3` in the same directory.
 
 ### Configure MCP
 
@@ -48,13 +56,13 @@ Add to your `.mcp.json` or MCP client config:
   "mcpServers": {
     "z39": {
       "type": "stdio",
-      "command": "/path/to/z39"
+      "command": "z39"
     }
   }
 }
 ```
 
-z39 finds z3 automatically: same directory as the z39 binary, `Z3_BIN` env var, or PATH.
+z39 finds z3 automatically: same directory as the z39 binary, `Z3_BIN` env var, `~/.local/share/z39/z3` (auto-downloaded), or PATH.
 
 ## Examples
 
